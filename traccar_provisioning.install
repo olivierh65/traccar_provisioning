@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * @file
+ * Install, update and requirements hooks for Traccar Provisioning.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function traccar_provisioning_requirements($phase) {
+  $requirements = [];
+
+  if ($phase === 'install' || $phase === 'runtime') {
+    $available = class_exists('\\QRcode');
+    $requirements['traccar_provisioning_qr_library'] = [
+      'title' => t('Traccar Provisioning - QR code library'),
+      'value' => $available ? t('Available') : t('Missing'),
+      'severity' => $available ? REQUIREMENT_OK : REQUIREMENT_ERROR,
+      'description' => t('The module requires the <a href=":url">tecnickcom/tcpdf</a> library to generate QR codes.', [
+        ':url' => 'https://packagist.org/packages/tecnickcom/tcpdf',
+      ]),
+    ];
+  }
+
+  return $requirements;
+}

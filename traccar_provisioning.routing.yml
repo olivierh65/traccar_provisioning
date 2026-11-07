@@ -1,0 +1,24 @@
+traccar_provisioning.settings:
+  path: '/admin/config/services/traccar-provisioning'
+  defaults:
+    _form: '\Drupal\traccar_provisioning\Form\SettingsForm'
+    _title: 'Traccar Provisioning'
+  requirements:
+    _permission: 'administer traccar provisioning'
+
+traccar_provisioning.provision:
+  path: '/traccar/configure'
+  defaults:
+    _form: '\Drupal\traccar_provisioning\Form\ProvisionForm'
+    _title: 'Configurer un appareil Traccar'
+  requirements:
+    _custom_access: '\Drupal\traccar_provisioning\Access\ProvisionAccess::access'
+
+traccar_provisioning.result:
+  path: '/traccar/configure/result/{token}'
+  defaults:
+    _controller: '\Drupal\traccar_provisioning\Controller\ProvisionResultController::view'
+    _title: 'Configuration Traccar générée'
+  requirements:
+    _custom_access: '\Drupal\traccar_provisioning\Access\ProvisionAccess::access'
+    token: '[a-f0-9]{32}'

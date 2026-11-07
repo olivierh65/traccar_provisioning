@@ -1,0 +1,12 @@
+traccar_provisioning.settings:
+  title: 'Traccar Provisioning'
+  description: 'Configurer la connexion au serveur Traccar et les paramètres des clients.'
+  parent: system.admin_config_services
+  route_name: traccar_provisioning.settings
+
+traccar_provisioning.provision:
+  title: 'Configurer un appareil Traccar'
+  description: 'Créer un appareil et générer son QR code de configuration.'
+  menu_name: main
+  route_name: traccar_provisioning.provision
+  weight: 50

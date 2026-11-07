@@ -1,0 +1,9 @@
+{
+  "name": "drupal/traccar_provisioning",
+  "description": "Generates QR codes and configuration URLs for Traccar clients.",
+  "type": "drupal-module",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "tecnickcom/tcpdf": "^6.6"
+  }
+}

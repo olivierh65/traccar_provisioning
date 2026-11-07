@@ -1,0 +1,26 @@
+<?php
+
+/**
+ * @file
+ * Traccar Provisioning module.
+ */
+
+/**
+ * Implements hook_theme().
+ */
+function traccar_provisioning_theme($existing, $type, $theme, $path) {
+  return [
+    'traccar_provision_result' => [
+      'variables' => [
+        'identifier' => '',
+        'name' => '',
+        'device_id' => 0,
+        'group_name' => '',
+        'config_url' => '',
+        'qr_svg' => '',
+        'parameters' => [],
+        'created' => NULL,
+      ],
+    ],
+  ];
+}

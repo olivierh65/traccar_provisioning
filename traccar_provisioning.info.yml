@@ -1,0 +1,8 @@
+name: 'Traccar Provisioning'
+type: module
+description: 'Crée des appareils Traccar et génère les QR codes / URL de configuration pour les clients Android et iOS.'
+package: Custom
+core_version_requirement: ^10 || ^11
+configure: traccar_provisioning.settings
+dependencies:
+  - drupal:system

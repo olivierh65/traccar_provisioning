@@ -1,0 +1,8 @@
+administer traccar provisioning:
+  title: 'Administrer Traccar Provisioning'
+  description: 'Configurer la connexion au serveur Traccar, les paramètres des clients et les valeurs par défaut.'
+  restrict access: true
+
+use traccar provisioning:
+  title: 'Utiliser Traccar Provisioning'
+  description: 'Créer des appareils Traccar et générer les QR codes et URL de configuration.'

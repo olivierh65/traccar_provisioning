@@ -1,0 +1,67 @@
+traccar_provisioning.settings:
+  type: config_object
+  label: 'Traccar Provisioning settings'
+  mapping:
+    api_url:
+      type: string
+      label: 'Traccar API base URL'
+    client_url:
+      type: string
+      label: 'Traccar Client tracking URL'
+    auth_method:
+      type: string
+      label: 'Authentication method'
+    username:
+      type: string
+      label: 'Traccar username or e-mail'
+    password:
+      type: string
+      label: 'Traccar password'
+    api_token:
+      type: string
+      label: 'Traccar API token'
+    timeout:
+      type: integer
+      label: 'HTTP timeout'
+    verify_ssl:
+      type: boolean
+      label: 'Verify SSL certificates'
+    accuracy:
+      type: string
+      label: 'Client location accuracy'
+    distance:
+      type: integer
+      label: 'Client distance in meters'
+    interval:
+      type: integer
+      label: 'Client interval in seconds'
+    angle:
+      type: integer
+      label: 'Client angle in degrees'
+    heartbeat:
+      type: integer
+      label: 'Client stationary heartbeat in seconds'
+    buffer:
+      type: boolean
+      label: 'Client offline buffering'
+    wakelock:
+      type: boolean
+      label: 'Client wake lock'
+    stop_detection:
+      type: boolean
+      label: 'Client stop detection'
+    prefer_platform_providers:
+      type: boolean
+      label: 'Client prefer platform location providers'
+    group_required:
+      type: boolean
+      label: 'Require a Traccar group'
+    qr_size:
+      type: integer
+      label: 'QR code size in pixels'
+    qr_error_correction:
+      type: string
+      label: 'QR code error correction level'
+    identifier_pattern:
+      type: string
+      label: 'Optional identifier validation pattern'

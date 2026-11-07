@@ -1,0 +1,75 @@
+{#
+/**
+ * @file
+ * Theme implementation for a Traccar provisioning result.
+ *
+ * Available variables:
+ * - identifier: The Traccar device unique identifier.
+ * - name: The device display name.
+ * - device_id: The internal Traccar device ID.
+ * - group_name: The selected Traccar group name.
+ * - config_url: The URL to import in Traccar Client.
+ * - qr_svg: The generated QR code SVG markup.
+ * - parameters: Tracking settings labels and values.
+ * - created: Creation timestamp.
+ */
+#}
+<div class="traccar-provision-result">
+  <div class="traccar-provision-result__header">
+    <p class="traccar-provision-result__success">
+      {% if name != identifier %}
+        {{ 'L’appareil @name (@identifier) a été créé sur le serveur Traccar.'|t({'@name': name, '@identifier': identifier}) }}
+      {% else %}
+        {{ 'L’appareil @identifier a été créé sur le serveur Traccar.'|t({'@identifier': identifier}) }}
+      {% endif %}
+    </p>
+    <p>
+      {{ 'Groupe : @group — ID interne Traccar : @id'|t({'@group': group_name, '@id': device_id}) }}
+    </p>
+  </div>
+
+  <div class="traccar-provision-result__main">
+    <div class="traccar-provision-result__qr" aria-label="{{ 'QR code de configuration Traccar'|t }}">
+      {{ qr_svg|raw }}
+    </div>
+
+    <div class="traccar-provision-result__details">
+      <h2>{{ 'URL de configuration'|t }}</h2>
+      <div class="traccar-provision-result__url">
+        <code id="traccar-config-url">{{ config_url }}</code>
+        <button type="button" class="button" data-traccar-copy="#traccar-config-url">
+          {{ 'Copier'|t }}
+        </button>
+      </div>
+
+      <details class="traccar-provision-result__parameters">
+        <summary>{{ 'Paramètres de suivi appliqués'|t }}</summary>
+        <dl>
+          {% for label, value in parameters %}
+            <dt>{{ label }}</dt>
+            <dd>{{ value }}</dd>
+          {% endfor %}
+        </dl>
+      </details>
+    </div>
+  </div>
+
+  <div class="traccar-provision-result__instructions">
+    <h2>{{ 'Comment configurer l’application Traccar Client'|t }}</h2>
+    <ol>
+      <li>{{ 'Installez Traccar Client sur le téléphone Android ou iOS.'|t }}</li>
+      <li>{{ 'Ouvrez l’application, puis utilisez la fonction de scan du QR code. Le QR code doit être scanné depuis Traccar Client, et non depuis l’appareil photo du téléphone.'|t }}</li>
+      <li>{{ 'Vérifiez que l’identifiant et l’URL du serveur sont corrects, puis validez l’importation.'|t }}</li>
+      <li>{{ 'Activez le suivi continu dans l’application.'|t }}</li>
+    </ol>
+    <p class="traccar-provision-result__hint">
+      {{ 'Si le scan n’est pas disponible, saisissez l’identifiant et l’URL du serveur dans les réglages de Traccar Client, puis reportez les paramètres de suivi ci-dessus.'|t }}
+    </p>
+  </div>
+
+  <p class="traccar-provision-result__actions">
+    <a class="button button--primary" href="{{ path('traccar_provisioning.provision') }}">
+      {{ 'Configurer un autre appareil'|t }}
+    </a>
+  </p>
+</div>

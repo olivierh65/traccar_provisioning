@@ -1,0 +1,25 @@
+services:
+  logger.channel.traccar_provisioning:
+    parent: logger.channel_base
+    arguments: ['traccar_provisioning']
+
+  traccar_provisioning.api_client:
+    class: Drupal\traccar_provisioning\Service\TraccarApiClient
+    arguments:
+      - '@http_client'
+      - '@config.factory'
+      - '@logger.channel.traccar_provisioning'
+
+  traccar_provisioning.qr_generator:
+    class: Drupal\traccar_provisioning\Service\QrCodeGenerator
+    arguments:
+      - '@config.factory'
+
+  traccar_provisioning.provisioning_manager:
+    class: Drupal\traccar_provisioning\Service\ProvisioningManager
+    arguments:
+      - '@traccar_provisioning.api_client'
+      - '@traccar_provisioning.qr_generator'
+      - '@config.factory'
+      - '@logger.channel.traccar_provisioning'
+      - '@datetime.time'

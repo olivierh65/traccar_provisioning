@@ -1,0 +1,90 @@
+.traccar-provision-result {
+  max-width: 980px;
+}
+
+.traccar-provision-result__success {
+  font-size: 1.15em;
+  font-weight: 700;
+}
+
+.traccar-provision-result__main {
+  display: grid;
+  grid-template-columns: minmax(220px, 340px) 1fr;
+  gap: 2rem;
+  align-items: start;
+  margin: 1.5rem 0;
+}
+
+.traccar-provision-result__qr {
+  background: #fff;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.traccar-provision-result__qr svg {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.traccar-provision-result__url {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.traccar-provision-result__url code {
+  display: block;
+  flex: 1 1 320px;
+  padding: 0.65rem 0.8rem;
+  background: #f4f4f5;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.traccar-provision-result__parameters {
+  margin-top: 1.5rem;
+}
+
+.traccar-provision-result__parameters dl {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 2fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 0;
+}
+
+.traccar-provision-result__parameters dt {
+  font-weight: 700;
+}
+
+.traccar-provision-result__parameters dd {
+  margin: 0;
+}
+
+.traccar-provision-result__instructions {
+  margin-top: 2rem;
+}
+
+.traccar-provision-result__hint {
+  font-style: italic;
+}
+
+@media (max-width: 700px) {
+  .traccar-provision-result__main {
+    grid-template-columns: 1fr;
+  }
+
+  .traccar-provision-result__parameters dl {
+    grid-template-columns: 1fr;
+  }
+
+  .traccar-provision-result__parameters dd {
+    margin-bottom: 0.5rem;
+  }
+}

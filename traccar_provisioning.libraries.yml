@@ -1,0 +1,10 @@
+provisioning:
+  version: 1.x
+  css:
+    theme:
+      css/traccar-provisioning.css: {}
+  js:
+    js/traccar-provisioning.js: {}
+  dependencies:
+    - core/drupal
+    - core/once
