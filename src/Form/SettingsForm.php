@@ -96,6 +96,9 @@ class SettingsForm extends ConfigFormBase {
         ? $this->t('Un token est déjà enregistré. Laissez vide pour le conserver.')
         : $this->t('Token généré dans Traccar (Paramètres du compte ou API). Utilisez de préférence un compte administrateur pour lister tous les groupes et créer les appareils.'),
       '#default_value' => '',
+      // Drupal's password element defaults to #maxlength 128, which silently
+      // truncates long Traccar tokens in the browser.
+      '#maxlength' => 512,
       '#attributes' => ['autocomplete' => 'off'],
       '#states' => [
         'visible' => [
@@ -387,9 +390,17 @@ class SettingsForm extends ConfigFormBase {
       ]));
     }
     catch (TraccarApiException $exception) {
-      $this->messenger()->addError($this->t('Échec du test de connexion : @message', [
+      $message = $this->t('Échec du test de connexion : @message', [
         '@message' => $exception->getMessage(),
-      ]));
+      ]);
+      if ($overrides['auth_method'] === 'token') {
+        $message = $this->t('Échec du test de connexion : @message (token utilisé : @token — @length caractères)', [
+          '@message' => $exception->getMessage(),
+          '@token' => $debug_token,
+          '@length' => strlen((string) $debug_token),
+        ]);
+      }
+      $this->messenger()->addError($message);
     }
 
     $form_state->setRebuild(TRUE);
