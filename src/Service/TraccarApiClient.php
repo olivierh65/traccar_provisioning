@@ -118,6 +118,44 @@ class TraccarApiClient {
   }
 
   /**
+   * Fetches calendars from Traccar and returns id => display name options.
+   *
+   * @param array $overrides
+   *   Optional configuration overrides, used to test unsaved settings.
+   *
+   * @return array<int, string>
+   *   Calendar options keyed by calendar ID.
+   *
+   * @throws \Drupal\traccar_provisioning\Exception\TraccarApiException
+   *   When the API request fails.
+   */
+  public function getCalendars(array $overrides = []): array {
+    $data = $this->request('GET', '/calendars', [], 'fetch calendars', $overrides);
+    if (!is_array($data)) {
+      throw new TraccarApiException('Réponse inattendue du serveur Traccar pour la liste des calendriers.');
+    }
+
+    $calendars = [];
+    foreach ($data as $calendar) {
+      if (!is_array($calendar) || !isset($calendar['id'])) {
+        continue;
+      }
+      $id = (int) $calendar['id'];
+      if ($id <= 0) {
+        continue;
+      }
+      $name = trim((string) ($calendar['name'] ?? ''));
+      $calendars[$id] = $name !== '' ? $name : 'Calendrier #' . $id;
+    }
+
+    uasort($calendars, static function (string $a, string $b): int {
+      return strnatcasecmp($a, $b);
+    });
+
+    return $calendars;
+  }
+
+  /**
    * Finds a device by its exact unique identifier.
    *
    * @param string $unique_id
@@ -152,6 +190,9 @@ class TraccarApiClient {
    *   The display name.
    * @param int $group_id
    *   The group ID, or 0 for no group.
+   * @param array $extra
+   *   Optional additional device properties, for example phone, model,
+   *   contact, category, calendarId or expirationTime.
    *
    * @return array
    *   The created device data.
@@ -159,13 +200,22 @@ class TraccarApiClient {
    * @throws \Drupal\traccar_provisioning\Exception\TraccarApiException
    *   When the API request fails.
    */
-  public function createDevice(string $unique_id, string $name, int $group_id = 0): array {
+  public function createDevice(string $unique_id, string $name, int $group_id = 0, array $extra = []): array {
+    $payload = [
+      'name' => $name,
+      'uniqueId' => $unique_id,
+      'groupId' => $group_id,
+    ];
+
+    foreach (['phone', 'model', 'contact', 'category', 'calendarId', 'expirationTime'] as $key) {
+      if (!array_key_exists($key, $extra) || $extra[$key] === NULL || $extra[$key] === '') {
+        continue;
+      }
+      $payload[$key] = $extra[$key];
+    }
+
     $data = $this->request('POST', '/devices', [
-      'json' => [
-        'name' => $name,
-        'uniqueId' => $unique_id,
-        'groupId' => $group_id,
-      ],
+      'json' => $payload,
     ], 'create device');
 
     if (!is_array($data) || empty($data['id'])) {

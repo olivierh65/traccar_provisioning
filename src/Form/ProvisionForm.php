@@ -98,6 +98,15 @@ class ProvisionForm extends FormBase {
     $config = $this->configFactory()->get('traccar_provisioning.settings');
     $group_required = (bool) $config->get('group_required');
 
+    $calendars = [];
+    $calendars_error = NULL;
+    try {
+      $calendars = $this->provisioningManager->getCalendars();
+    }
+    catch (TraccarApiException $exception) {
+      $calendars_error = $exception->getMessage();
+    }
+
     if ($groups === []) {
       $form['no_groups'] = [
         '#type' => 'html_tag',
@@ -154,22 +163,135 @@ class ProvisionForm extends FormBase {
       $form['group_id']['#empty_option'] = $this->t('- Sélectionnez un groupe -');
     }
 
-    $rows = [];
-    foreach ($this->provisioningManager->getParameterSummary() as $label => $value) {
-      $rows[] = [$label, $value];
+    $form['device_details'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Informations complémentaires de l’appareil (optionnel)'),
+      '#open' => TRUE,
+      '#description' => $this->t('Ces informations sont enregistrées sur le serveur Traccar. Elles ne sont pas transmises par le QR code.'),
+    ];
+
+    if ($calendars_error !== NULL) {
+      $form['device_details']['calendars_warning'] = [
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#attributes' => ['class' => ['messages', 'messages--warning']],
+        '#value' => $this->t('Impossible de charger les calendriers Traccar : @message', [
+          '@message' => $calendars_error,
+        ]),
+      ];
     }
+
+    $form['device_details']['phone'] = [
+      '#type' => 'tel',
+      '#title' => $this->t('Téléphone'),
+      '#description' => $this->t('Numéro associé à l’appareil, utilisé notamment pour les commandes SMS.'),
+      '#maxlength' => 255,
+      '#default_value' => $form_state->getValue('phone', ''),
+    ];
+
+    $form['device_details']['model'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Modèle'),
+      '#description' => $this->t('Modèle ou référence matérielle de l’appareil.'),
+      '#maxlength' => 255,
+      '#default_value' => $form_state->getValue('model', ''),
+    ];
+
+    $form['device_details']['contact'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Contact'),
+      '#description' => $this->t('Personne responsable de l’appareil.'),
+      '#maxlength' => 255,
+      '#default_value' => $form_state->getValue('contact', ''),
+    ];
+
+    $form['device_details']['category'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Catégorie'),
+      '#description' => $this->t('Catégorie libre utilisée pour regrouper les appareils dans l’interface Traccar.'),
+      '#maxlength' => 255,
+      '#default_value' => $form_state->getValue('category', ''),
+    ];
+
+    $form['device_details']['calendar_id'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Calendrier'),
+      '#description' => $calendars === []
+        ? $this->t('Aucun calendrier n’est défini sur le serveur Traccar.')
+        : $this->t('Le calendrier filtre les positions de l’appareil selon ses plages horaires.'),
+      '#options' => [0 => $this->t('Aucun calendrier')] + $calendars,
+      '#default_value' => (int) $form_state->getValue('calendar_id', 0),
+    ];
+
+    $form['device_details']['expiration'] = [
+      '#type' => 'date',
+      '#title' => $this->t('Expiration'),
+      '#description' => $this->t('Après cette date, Traccar refuse les nouvelles positions de l’appareil. Les données existantes restent consultables. La date est appliquée en fin de journée, dans le fuseau horaire du site.'),
+      '#default_value' => $form_state->getValue('expiration', ''),
+    ];
 
     $form['parameters'] = [
       '#type' => 'details',
       '#title' => $this->t('Paramètres de suivi appliqués'),
-      '#open' => FALSE,
+      '#open' => TRUE,
+      '#description' => $this->t('Ces valeurs sont intégrées dans l’URL et le QR code générés pour cet appareil. Elles sont préremplies avec les valeurs par défaut du module et peuvent être adaptées.'),
     ];
-    $form['parameters']['table'] = [
-      '#type' => 'table',
-      '#header' => [$this->t('Paramètre'), $this->t('Valeur')],
-      '#rows' => $rows,
-      '#empty' => $this->t('Aucun paramètre.'),
+
+    $form['parameters']['accuracy'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Précision'),
+      '#options' => [
+        'highest' => $this->t('Maximale (GPS permanent)'),
+        'high' => $this->t('Haute'),
+        'medium' => $this->t('Moyenne'),
+        'low' => $this->t('Basse'),
+      ],
+      '#default_value' => $form_state->getValue('accuracy', (string) $config->get('accuracy') ?: 'high'),
+      '#required' => TRUE,
     ];
+
+    $number_fields = [
+      'distance' => [
+        'title' => $this->t('Distance minimale (mètres)'),
+        'max' => 100000,
+      ],
+      'interval' => [
+        'title' => $this->t('Intervalle (secondes)'),
+        'max' => 86400,
+      ],
+      'angle' => [
+        'title' => $this->t('Angle (degrés)'),
+        'max' => 360,
+      ],
+      'heartbeat' => [
+        'title' => $this->t('Heartbeat stationnaire (secondes)'),
+        'max' => 86400,
+      ],
+    ];
+    foreach ($number_fields as $key => $definition) {
+      $form['parameters'][$key] = [
+        '#type' => 'number',
+        '#title' => $definition['title'],
+        '#default_value' => $form_state->getValue($key, (int) $config->get($key)),
+        '#min' => 0,
+        '#max' => $definition['max'],
+        '#required' => TRUE,
+      ];
+    }
+
+    $checkbox_fields = [
+      'buffer' => $this->t('Activer le buffer hors ligne'),
+      'wakelock' => $this->t('Activer le wake lock (Android)'),
+      'stop_detection' => $this->t('Activer la détection des arrêts'),
+      'prefer_platform_providers' => $this->t('Préférer les fournisseurs de localisation du système (Android)'),
+    ];
+    foreach ($checkbox_fields as $key => $title) {
+      $form['parameters'][$key] = [
+        '#type' => 'checkbox',
+        '#title' => $title,
+        '#default_value' => $form_state->getValue($key, (bool) $config->get($key)),
+      ];
+    }
 
     $form['actions']['submit'] = [
       '#type' => 'submit',
@@ -195,6 +317,48 @@ class ProvisionForm extends FormBase {
       $form_state->setErrorByName('name', $this->t('Le nom ne peut pas dépasser 255 caractères.'));
     }
 
+    $labels = [
+      'phone' => $this->t('Téléphone'),
+      'model' => $this->t('Modèle'),
+      'contact' => $this->t('Contact'),
+      'category' => $this->t('Catégorie'),
+    ];
+    foreach ($labels as $key => $label) {
+      if (mb_strlen(trim((string) $form_state->getValue($key))) > 255) {
+        $form_state->setErrorByName($key, $this->t('Le champ « @label » ne peut pas dépasser 255 caractères.', [
+          '@label' => $label,
+        ]));
+      }
+    }
+
+    $expiration = trim((string) $form_state->getValue('expiration'));
+    if ($expiration !== '') {
+      $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $expiration);
+      $errors = \DateTimeImmutable::getLastErrors();
+      if ($date === FALSE || ($errors !== FALSE && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+        $form_state->setErrorByName('expiration', $this->t('La date d’expiration est invalide.'));
+      }
+    }
+
+    if (!in_array((string) $form_state->getValue('accuracy'), ['highest', 'high', 'medium', 'low'], TRUE)) {
+      $form_state->setErrorByName('accuracy', $this->t('Niveau de précision invalide.'));
+    }
+
+    $number_limits = [
+      'distance' => 100000,
+      'interval' => 86400,
+      'angle' => 360,
+      'heartbeat' => 86400,
+    ];
+    foreach ($number_limits as $key => $max) {
+      $value = (int) $form_state->getValue($key);
+      if ($value < 0 || $value > $max) {
+        $form_state->setErrorByName($key, $this->t('Cette valeur doit être comprise entre 0 et @max.', [
+          '@max' => $max,
+        ]));
+      }
+    }
+
     $config = $this->configFactory()->get('traccar_provisioning.settings');
     if ((bool) $config->get('group_required') && (int) $form_state->getValue('group_id') <= 0) {
       $form_state->setErrorByName('group_id', $this->t('Vous devez sélectionner un groupe.'));
@@ -208,9 +372,28 @@ class ProvisionForm extends FormBase {
     $identifier = trim((string) $form_state->getValue('identifier'));
     $name = trim((string) $form_state->getValue('name'));
     $group_id = (int) $form_state->getValue('group_id');
+    $device_data = [
+      'phone' => trim((string) $form_state->getValue('phone')),
+      'model' => trim((string) $form_state->getValue('model')),
+      'contact' => trim((string) $form_state->getValue('contact')),
+      'category' => trim((string) $form_state->getValue('category')),
+      'calendar_id' => (int) $form_state->getValue('calendar_id', 0),
+      'expiration' => trim((string) $form_state->getValue('expiration')),
+    ];
+    $tracking = [
+      'accuracy' => (string) $form_state->getValue('accuracy'),
+      'distance' => (int) $form_state->getValue('distance'),
+      'interval' => (int) $form_state->getValue('interval'),
+      'angle' => (int) $form_state->getValue('angle'),
+      'heartbeat' => (int) $form_state->getValue('heartbeat'),
+      'buffer' => (bool) $form_state->getValue('buffer'),
+      'wakelock' => (bool) $form_state->getValue('wakelock'),
+      'stop_detection' => (bool) $form_state->getValue('stop_detection'),
+      'prefer_platform_providers' => (bool) $form_state->getValue('prefer_platform_providers'),
+    ];
 
     try {
-      $result = $this->provisioningManager->createProvisioning($identifier, $name, $group_id);
+      $result = $this->provisioningManager->createProvisioning($identifier, $name, $group_id, $device_data, $tracking);
     }
     catch (ProvisioningException $exception) {
       $this->messenger()->addError($exception->getMessage());

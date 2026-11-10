@@ -19,6 +19,7 @@ function traccar_provisioning_theme($existing, $type, $theme, $path) {
         'config_url' => '',
         'qr_svg' => '',
         'parameters' => [],
+        'device_details' => [],
         'created' => NULL,
       ],
     ],

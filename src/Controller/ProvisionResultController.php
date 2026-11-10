@@ -52,6 +52,7 @@ class ProvisionResultController extends ControllerBase {
       '#config_url' => $result['config_url'],
       '#qr_svg' => $result['qr_svg'] ?? '',
       '#parameters' => $result['parameters'] ?? [],
+      '#device_details' => $result['device_details'] ?? [],
       '#created' => $result['created'] ?? NULL,
       '#attached' => [
         'library' => ['traccar_provisioning/provisioning'],
