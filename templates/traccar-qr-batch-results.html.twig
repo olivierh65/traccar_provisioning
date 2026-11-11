@@ -1,0 +1,49 @@
+{#
+/**
+ * @file
+ * Theme implementation for a batch of Traccar QR codes.
+ *
+ * Available variables:
+ * - results: A list of QR code results with id, label, url, svg and optional
+ *   created, device_id, name, group_name, manifestation_name and
+ *   device_details keys.
+ */
+#}
+<div class="traccar-qr-batch-results">
+  <div class="traccar-qr-batch-results__actions">
+    <button type="button" class="button button--primary" onclick="window.print()">
+      {{ 'Imprimer la planche de QR codes'|t }}
+    </button>
+  </div>
+
+  <div class="traccar-qr-batch-grid">
+    {% for result in results %}
+      <div class="traccar-qr-batch-item">
+        <div class="traccar-qr-batch-item__qr">{{ result.svg|raw }}</div>
+        <div class="traccar-qr-batch-item__label">{{ result.label }}</div>
+        {% if result.created is defined and result.created %}
+          <div class="traccar-qr-batch-item__status">
+            {{ 'Appareil créé sur Traccar'|t }}{% if result.device_id is defined %} — #{{ result.device_id }}{% endif %}
+          </div>
+        {% endif %}
+        {% if result.name is defined and result.name != result.label %}
+          <div class="traccar-qr-batch-item__meta"><strong>{{ 'Nom Traccar'|t }} :</strong> {{ result.name }}</div>
+        {% endif %}
+        {% if result.group_name is defined and result.group_name %}
+          <div class="traccar-qr-batch-item__meta"><strong>{{ 'Groupe'|t }} :</strong> {{ result.group_name }}</div>
+        {% endif %}
+        {% if result.manifestation_name is defined and result.manifestation_name %}
+          <div class="traccar-qr-batch-item__meta"><strong>{{ 'Manifestation'|t }} :</strong> {{ result.manifestation_name }}</div>
+        {% endif %}
+        {% if result.device_details is defined and result.device_details %}
+          <div class="traccar-qr-batch-item__details">
+            {% for label, value in result.device_details %}
+              <div><strong>{{ label }} :</strong> {{ value }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="traccar-qr-batch-item__url"><code>{{ result.url }}</code></div>
+      </div>
+    {% endfor %}
+  </div>
+</div>

@@ -16,11 +16,17 @@ function traccar_provisioning_theme($existing, $type, $theme, $path) {
         'name' => '',
         'device_id' => 0,
         'group_name' => '',
+        'manifestation_name' => '',
         'config_url' => '',
         'qr_svg' => '',
         'parameters' => [],
         'device_details' => [],
         'created' => NULL,
+      ],
+    ],
+    'traccar_qr_batch_results' => [
+      'variables' => [
+        'results' => [],
       ],
     ],
   ];

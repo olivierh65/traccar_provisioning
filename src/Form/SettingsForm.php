@@ -4,6 +4,7 @@ namespace Drupal\traccar_provisioning\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\traccar_provisioning\Exception\TraccarApiException;
 use Drupal\traccar_provisioning\Service\TraccarApiClient;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -252,6 +253,20 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Expression régulière PCRE optionnelle, par exemple <code>^[0-9]{6,12}$</code> pour n’accepter que des numéros. Laissez vide pour accepter tous les identifiants valides pour Traccar.'),
     ];
 
+    $form['provisioning']['allowed_categories'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Catégories autorisées'),
+      '#default_value' => (string) $config->get('allowed_categories'),
+      '#rows' => 5,
+      '#description' => $this->t('Une catégorie par ligne, ou plusieurs séparées par des virgules. Si la liste est vide, toute catégorie est acceptée. Traccar ne fournit pas de référentiel de catégories : cette liste permet de vérifier les catégories saisies dans les lots.'),
+    ];
+
+    $form['provisioning']['manifestation_delete_link'] = [
+      '#type' => 'link',
+      '#title' => $this->t('Supprimer les appareils d’une manifestation'),
+      '#url' => Url::fromRoute('traccar_provisioning.manifestation_delete'),
+    ];
+
     $form['qr'] = [
       '#type' => 'details',
       '#title' => $this->t('QR code'),
@@ -278,6 +293,23 @@ class SettingsForm extends ConfigFormBase {
       ],
       '#default_value' => (string) $config->get('qr_error_correction') ?: 'M',
       '#required' => TRUE,
+    ];
+
+    $form['qr']['qr_api_key'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Clé API de l’endpoint QR'),
+      '#default_value' => (string) $config->get('qr_api_key'),
+      '#maxlength' => 255,
+      '#description' => $this->t('Clé secrète à ajouter dans le paramètre <code>key</code> des URL de génération de QR codes. Utilisez une chaîne aléatoire d’au moins 16 caractères. Laissez vide pour désactiver l’endpoint. Exemple : <code>@url?id=IDENTIFIANT&amp;key=VOTRE_CLE&amp;format=png</code>', [
+        '@url' => Url::fromRoute('traccar_provisioning.qr', [], ['absolute' => TRUE])->toString(),
+      ]),
+      '#attributes' => ['autocomplete' => 'off'],
+    ];
+
+    $form['qr']['qr_batch_link'] = [
+      '#type' => 'link',
+      '#title' => $this->t('Générer des QR codes en lot'),
+      '#url' => Url::fromRoute('traccar_provisioning.qr_batch'),
     ];
 
     $form = parent::buildForm($form, $form_state);
@@ -354,6 +386,11 @@ class SettingsForm extends ConfigFormBase {
       $form_state->setErrorByName('qr_error_correction', $this->t('Niveau de correction d’erreur invalide.'));
     }
 
+    $qr_api_key = trim((string) $values['qr_api_key']);
+    if ($qr_api_key !== '' && mb_strlen($qr_api_key) < 16) {
+      $form_state->setErrorByName('qr_api_key', $this->t('La clé API QR doit contenir au moins 16 caractères.'));
+    }
+
     $pattern = trim((string) $values['identifier_pattern']);
     if ($pattern !== '' && @preg_match($pattern, '') === FALSE) {
       $form_state->setErrorByName('identifier_pattern', $this->t('L’expression régulière est invalide.'));
@@ -390,17 +427,9 @@ class SettingsForm extends ConfigFormBase {
       ]));
     }
     catch (TraccarApiException $exception) {
-      $message = $this->t('Échec du test de connexion : @message', [
+      $this->messenger()->addError($this->t('Échec du test de connexion : @message', [
         '@message' => $exception->getMessage(),
-      ]);
-      if ($overrides['auth_method'] === 'token') {
-        $message = $this->t('Échec du test de connexion : @message (token utilisé : @token — @length caractères)', [
-          '@message' => $exception->getMessage(),
-          '@token' => $debug_token,
-          '@length' => strlen((string) $debug_token),
-        ]);
-      }
-      $this->messenger()->addError($message);
+      ]));
     }
 
     $form_state->setRebuild(TRUE);
@@ -439,8 +468,10 @@ class SettingsForm extends ConfigFormBase {
       ->set('prefer_platform_providers', (bool) $values['prefer_platform_providers'])
       ->set('group_required', (bool) $values['group_required'])
       ->set('identifier_pattern', trim((string) $values['identifier_pattern']))
+      ->set('allowed_categories', trim((string) $values['allowed_categories']))
       ->set('qr_size', (int) $values['qr_size'])
-      ->set('qr_error_correction', (string) $values['qr_error_correction']);
+      ->set('qr_error_correction', (string) $values['qr_error_correction'])
+      ->set('qr_api_key', trim((string) $values['qr_api_key']));
 
     // Only overwrite the secret used by the selected authentication method,
     // and only when the user entered a new value.

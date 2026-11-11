@@ -1,0 +1,243 @@
+# Traccar Provisioning
+
+Module Drupal 10/11 qui crée des appareils sur un serveur Traccar et génère les URL de configuration et les QR codes destinés à l’application Traccar Client (Android et iOS).
+
+## Fonctionnalités
+
+- Connexion à l’API Traccar par token API (recommandé) ou email / mot de passe.
+- Configuration de l’URL de l’API, de l’URL de suivi du client, du timeout HTTP et de la vérification SSL.
+- Paramètres de suivi par défaut : précision, distance, intervalle, angle, heartbeat, buffer hors ligne, wake lock, détection des arrêts et fournisseurs de localisation du système.
+- Création d’un appareil depuis une page dédiée, avec :
+  - identifiant unique et nom affiché ;
+  - groupe Traccar optionnel ou obligatoire selon la configuration ;
+  - informations complémentaires optionnelles : téléphone, modèle, contact, catégorie, calendrier et date d’expiration ;
+  - paramètres de suivi adaptables pour l’appareil.
+- Génération d’un QR code SVG et d’une URL de configuration, avec bouton de copie et instructions pour Traccar Client.
+- Refus des identifiants déjà existants sur le serveur Traccar.
+- Page de génération en lot : collage de lignes CSV, paramètres serveur par appareil, validation, création optionnelle des appareils et planche imprimable de QR codes.
+- Gestion des manifestations : rattachement des appareils créés à une manifestation existante ou nouvelle, puis suppression en masse des appareils associés.
+- Liste optionnelle de catégories autorisées pour contrôler les valeurs saisies dans les lots.
+- Format d’identifiant configurable par expression régulière PCRE.
+- Endpoint public protégé par clé pour générer un QR code PNG ou SVG à la volée.
+- Macro LibreOffice Calc pour insérer des QR codes PNG dans une feuille à partir d’une colonne d’identifiants.
+- Résultat de création conservé 24 h dans le stockage privé de l’utilisateur.
+
+## Prérequis
+
+- Drupal 10 ou 11.
+- La bibliothèque `tecnickcom/tcpdf` ^6.6, qui fournit la classe `QRcode`.
+- Un serveur Traccar accessible depuis Drupal.
+- Un compte Traccar disposant des droits de lecture des groupes et calendriers et de création des appareils. Un compte administrateur est recommandé.
+- HTTPS est fortement recommandé, en particulier pour l’endpoint QR et les secrets.
+
+## Installation
+
+Placez le module dans `modules/custom/traccar_provisioning`, puis installez la dépendance QR :
+
+```bash
+composer require tecnickcom/tcpdf
+drush en traccar_provisioning
+drush cr
+```
+
+Lors d’une mise à jour du module :
+
+```bash
+drush updb -y
+drush cr
+```
+
+## Configuration
+
+Page de configuration : `/admin/config/services/traccar-provisioning`
+
+- **Connexion au serveur Traccar**
+  - URL de base de l’API, par exemple `https://traccar.example.com:8082`. Le suffixe `/api` est ajouté automatiquement s’il est absent.
+  - URL de suivi utilisée par Traccar Client, par exemple `https://traccar.example.com:5055`.
+  - Méthode d’authentification : token API ou email / mot de passe.
+  - Timeout HTTP de 1 à 120 secondes et vérification des certificats SSL.
+  - Bouton **Tester la connexion**.
+- **Paramètres par défaut du client**
+  - Précision, distance minimale, intervalle, angle, heartbeat et options Android.
+  - Ces valeurs sont intégrées dans les URL et QR codes, puis peuvent être adaptées par appareil.
+- **Création des appareils**
+  - Imposer ou non la sélection d’un groupe.
+  - Format d’identifiant autorisé (regex PCRE optionnelle).
+  - Catégories autorisées (une par ligne ou séparées par des virgules). Si la liste est vide, toute catégorie est acceptée. Cette liste est utilisée pour valider les catégories des lots.
+  - Lien vers la suppression des appareils d’une manifestation.
+- **QR code**
+  - Taille du QR code (100 à 1000 pixels).
+  - Niveau de correction d’erreur L, M, Q ou H.
+  - Clé API de l’endpoint QR (16 caractères minimum). Une clé vide désactive l’endpoint.
+  - Lien vers la page de génération en lot.
+
+Les onglets **QR codes en lot** et **Suppression par manifestation** sont également disponibles depuis la page de configuration.
+
+## Routes
+
+| Page | Route | Chemin | Accès |
+| --- | --- | --- | --- |
+| Configuration du module | `traccar_provisioning.settings` | `/admin/config/services/traccar-provisioning` | `administer traccar provisioning` |
+| Génération de QR codes en lot | `traccar_provisioning.qr_batch` | `/admin/config/services/traccar-provisioning/qr-batch` | `administer traccar provisioning` |
+| Suppression par manifestation | `traccar_provisioning.manifestation_delete` | `/admin/config/services/traccar-provisioning/manifestations/delete` | `administer traccar provisioning` |
+| Configurer un appareil | `traccar_provisioning.provision` | `/traccar/configure` | `use traccar provisioning` ou `administer traccar provisioning` |
+| Résultat de configuration | `traccar_provisioning.result` | `/traccar/configure/result/{token}` | Même accès, avec un token hexadécimal de 32 caractères |
+| Endpoint QR | `traccar_provisioning.qr` | `/traccar/qr` | Public, protégé par la clé `key` |
+
+Un lien de menu principal **Configurer un appareil Traccar** est fourni par le module.
+
+## Permissions
+
+- `administer traccar provisioning` : configurer la connexion Traccar, les paramètres clients, les valeurs par défaut, la clé QR, accéder à la génération en lot et à la suppression par manifestation.
+- `use traccar provisioning` : accéder à la page de configuration d’un appareil et à ses résultats.
+
+## Mode d’emploi rapide
+
+### 1. Configurer le module
+
+1. Ouvrir `/admin/config/services/traccar-provisioning`.
+2. Renseigner l’URL de l’API, l’URL de suivi du client et l’authentification.
+3. Cliquer sur **Tester la connexion**.
+4. Ajuster les paramètres de suivi par défaut et les options de création.
+5. Définir éventuellement une clé API QR et une liste de catégories autorisées.
+6. Enregistrer la configuration.
+
+### 2. Configurer un appareil
+
+1. Ouvrir `/traccar/configure` ou le lien de menu **Configurer un appareil Traccar**.
+2. Saisir l’identifiant de l’appareil, son nom et son groupe.
+3. Choisir éventuellement une manifestation existante ou créer une nouvelle manifestation.
+4. Renseigner si besoin le téléphone, le modèle, le contact, la catégorie, le calendrier et la date d’expiration.
+5. Adapter les paramètres de suivi.
+6. Cliquer sur **Créer l’appareil et générer le QR code**.
+7. Sur la page de résultat, scanner le QR code depuis Traccar Client ou copier l’URL de configuration.
+8. Suivre les instructions affichées pour activer le suivi dans l’application.
+
+### 3. Générer des QR codes en lot
+
+1. Ouvrir `/admin/config/services/traccar-provisioning/qr-batch`.
+2. Coller une ligne par appareil au format CSV décrit ci-dessous.
+3. Cocher **Créer les appareils sur le serveur Traccar** si les appareils doivent être créés. Si l’option est décochée, seuls les QR codes et les URL sont générés.
+4. Choisir éventuellement une manifestation existante ou créer une nouvelle manifestation pour tous les appareils du lot.
+5. Vérifier les paramètres de suivi globaux appliqués à tous les QR codes.
+6. Cliquer sur **Générer les QR codes**.
+7. Utiliser le bouton d’impression pour obtenir la planche de QR codes.
+
+### 4. Supprimer les appareils d’une manifestation
+
+1. Ouvrir `/admin/config/services/traccar-provisioning/manifestations/delete`.
+2. Choisir la manifestation dans la liste. Le nombre d’appareils associés est affiché.
+3. Cocher la case de confirmation.
+4. Cliquer sur **Supprimer les appareils**.
+
+Chaque appareil est supprimé du serveur Traccar, puis son association est supprimée de la base Drupal. Si un appareil n’existe déjà plus sur Traccar, son association est quand même nettoyée. La manifestation elle-même est conservée.
+
+### 5. Utiliser la macro LibreOffice Calc
+
+1. Ouvrir `calc/traccar_qr_macro.bas`.
+2. Modifier `QR_ENDPOINT` et `QR_KEY` en haut du fichier.
+3. Importer la macro dans LibreOffice Basic.
+4. Placer les identifiants en colonne A à partir de la ligne 2.
+5. Exécuter `InsertQrCodes` : les images QR sont insérées en colonne B et les URL écrites en colonne C.
+6. Utiliser `ClearQrCodes` pour supprimer les QR codes insérés.
+
+L’endpoint QR doit être activé et la clé API QR doit être renseignée.
+
+## Format CSV pour la génération en lot
+
+Une ligne par appareil, champs séparés par des points-virgules :
+
+```text
+identifiant;libellé;groupe;téléphone;modèle;contact;catégorie;calendrier;date d’expiration
+M1;Marshall 1;MCM;0123;M1;Alice;Camion;;15/11/2026
+M2;Marshall 2;Pilotes;0456;M2;Bob;;;31/12/2027
+```
+
+Règles :
+
+- Une ligne d’en-tête est ignorée.
+- Les champs vides sont autorisés.
+- Les lignes vides sont ignorées.
+- Les identifiants en double sont signalés en erreur.
+- Un champ contenant un point-virgule doit être entouré de guillemets doubles.
+- Les valeurs de groupe et de calendrier peuvent être un ID ou un nom, sans distinction de casse.
+- Pour les groupes, le chemin complet ou le nom de feuille unique est également accepté. En cas d’ambiguïté, utiliser l’ID.
+- Les dates acceptent `jj/mm/aaaa`, `jj-mm-aaaa`, `jj.mm.aaaa`, `aaaa-mm-jj`, ainsi que les années à deux chiffres.
+- Les champs serveur sont validés uniquement lorsque la création des appareils est demandée. En génération de QR seuls, ils sont ignorés.
+- Les paramètres de suivi sont globaux et s’appliquent à tous les QR codes du lot.
+
+## Manifestations
+
+Lors de la création d’un appareil, il est possible de le rattacher à une manifestation existante ou d’en créer une nouvelle. Le même choix est proposé pour un lot complet : tous les appareils créés par le lot sont alors associés à la même manifestation.
+
+Tables utilisées :
+
+- `traccar_manifestation` : `id`, `manifestation`.
+- `traccar_manifestation_device` : `manifestation_id`, `device_id`.
+
+Un appareil ne peut être associé qu’à une seule manifestation. Le rattacher à une autre manifestation déplace son association.
+
+La suppression en masse parcourt les appareils associés, les supprime du serveur Traccar, puis supprime leur association dans la base. Les appareils créés sans manifestation ne sont pas suivis par cette page.
+
+## Endpoint QR
+
+```text
+GET /traccar/qr?id=IDENTIFIANT&key=VOTRE_CLE&format=png&size=320
+```
+
+Paramètres :
+
+- `id` : identifiant Traccar obligatoire.
+- `key` : clé API QR configurée dans le module.
+- `format` : `png` (par défaut) ou `svg`.
+- `size` : taille en pixels, entre 100 et 1000.
+- Paramètres de suivi optionnels : `accuracy`, `distance`, `interval`, `angle`, `heartbeat`, `buffer`, `wakelock`, `stop_detection`, `prefer_platform_providers`.
+
+Comportement :
+
+- Clé vide ou invalide : réponse `403`.
+- Identifiant manquant ou invalide : réponse `400`.
+- Erreur de génération : réponse `500`.
+- Les QR codes renvoyés sont mis en cache public pendant 24 h ; les erreurs ne sont pas mises en cache.
+
+## Sécurité
+
+- Le token API et le mot de passe Traccar sont enregistrés dans la configuration Drupal. Restreignez l’accès à la page d’administration et n’exportez pas ces valeurs dans un dépôt public.
+- Un token API est recommandé par rapport à un mot de passe.
+- La clé API QR circule dans la chaîne de requête. Utilisez HTTPS et ne diffusez pas de feuille de calcul contenant la clé.
+- La comparaison de la clé QR utilise `hash_equals()`.
+- L’endpoint QR est désactivé lorsque la clé est vide.
+- Le résultat d’une création est stocké dans le stockage privé de l’utilisateur pendant 24 h et n’est pas public.
+
+## Dépannage
+
+- **« L’endpoint QR est désactivé »** : renseigner une clé API QR d’au moins 16 caractères dans les paramètres.
+- **Impossible de charger les groupes ou calendriers** : vérifier l’URL de l’API, le token, les droits du compte Traccar et la connectivité. La génération de QR seuls reste possible sans création d’appareil.
+- **« Un groupe est obligatoire »** : renseigner un groupe dans la ligne CSV ou désactiver l’option **Imposer la sélection d’un groupe**.
+- **« Un appareil avec l’identifiant … existe déjà »** : utiliser un autre identifiant ou supprimer l’appareil existant dans Traccar.
+- **Date d’expiration invalide** : utiliser l’un des formats acceptés.
+- **« La bibliothèque tecnickcom/tcpdf est requise »** : exécuter `composer require tecnickcom/tcpdf`.
+- **Le QR code ne s’ouvre pas avec l’appareil photo** : le QR code doit être scanné depuis Traccar Client, pas depuis l’application photo.
+- **Aucun groupe sur le serveur** : créer au moins un groupe dans Traccar ou désactiver l’obligation de groupe.
+
+## Notes
+
+- La page de lot produit une planche HTML imprimable, pas un PDF.
+- Les QR codes de la page de résultat et de la page de lot sont générés en SVG inline.
+- Les informations complémentaires de l’appareil sont enregistrées sur Traccar mais ne sont pas transmises par le QR code.
+- La date d’expiration est appliquée en fin de journée dans le fuseau horaire du site.
+- Les mises à jour `10001` et `10002` initialisent respectivement `qr_api_key` et `allowed_categories`. La mise à jour `10003` crée les tables de manifestations.
+
+## Vérifications
+
+- `php -l` sur les fichiers PHP modifiés : OK.
+- `phpcs` : aucune violation PHP ; deux avertissements JS préexistants dans `js/traccar-provisioning.js`.
+- `drush updb` : mises à jour `10001`, `10002` et `10003` exécutées.
+- `drush cr` : OK.
+- Tables `traccar_manifestation` et `traccar_manifestation_device` créées et testées.
+- Création, réutilisation et suppression d’associations de manifestations testées.
+- Rattachement d’un appareil à une manifestation testé lors de la création.
+- Suppression en masse testée, y compris le cas d’un appareil déjà absent de Traccar.
+- Parsing CSV testé : en-tête, lignes vides, doublons, groupe inconnu, calendrier inconnu, date invalide, catégorie non autorisée, colonnes en trop, séparateur tabulation et champ entre guillemets.
+- Création simulée testée : les paramètres par ligne et la manifestation sont transmis correctement.
+- Génération de QR seuls testée à partir de lignes CSV.

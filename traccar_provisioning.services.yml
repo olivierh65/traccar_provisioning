@@ -15,6 +15,11 @@ services:
     arguments:
       - '@config.factory'
 
+  traccar_provisioning.manifestation_manager:
+    class: Drupal\traccar_provisioning\Service\ManifestationManager
+    arguments:
+      - '@database'
+
   traccar_provisioning.provisioning_manager:
     class: Drupal\traccar_provisioning\Service\ProvisioningManager
     arguments:
@@ -23,3 +28,4 @@ services:
       - '@config.factory'
       - '@logger.channel.traccar_provisioning'
       - '@datetime.time'
+      - '@traccar_provisioning.manifestation_manager'

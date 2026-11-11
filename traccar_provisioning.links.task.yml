@@ -1,0 +1,9 @@
+traccar_provisioning.qr_batch:
+  title: 'QR codes en lot'
+  route_name: traccar_provisioning.qr_batch
+  base_route: traccar_provisioning.settings
+
+traccar_provisioning.manifestation_delete:
+  title: 'Suppression par manifestation'
+  route_name: traccar_provisioning.manifestation_delete
+  base_route: traccar_provisioning.settings

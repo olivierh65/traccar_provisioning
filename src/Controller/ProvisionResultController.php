@@ -49,6 +49,7 @@ class ProvisionResultController extends ControllerBase {
       '#name' => $result['name'] ?? '',
       '#device_id' => $result['device_id'] ?? 0,
       '#group_name' => $result['group_name'] ?? '',
+      '#manifestation_name' => $result['manifestation_name'] ?? '',
       '#config_url' => $result['config_url'],
       '#qr_svg' => $result['qr_svg'] ?? '',
       '#parameters' => $result['parameters'] ?? [],

@@ -41,14 +41,34 @@ class ProvisioningManager {
   protected TimeInterface $time;
 
   /**
+   * The manifestation storage.
+   */
+  protected ManifestationManager $manifestationManager;
+
+  /**
+   * Cached Traccar groups for the current request.
+   *
+   * @var array<int, string>|null
+   */
+  protected ?array $groupsCache = NULL;
+
+  /**
+   * Cached Traccar calendars for the current request.
+   *
+   * @var array<int, string>|null
+   */
+  protected ?array $calendarsCache = NULL;
+
+  /**
    * Constructs a new ProvisioningManager.
    */
-  public function __construct(TraccarApiClient $api_client, QrCodeGenerator $qr_generator, ConfigFactoryInterface $config_factory, LoggerInterface $logger, TimeInterface $time) {
+  public function __construct(TraccarApiClient $api_client, QrCodeGenerator $qr_generator, ConfigFactoryInterface $config_factory, LoggerInterface $logger, TimeInterface $time, ManifestationManager $manifestation_manager) {
     $this->apiClient = $api_client;
     $this->qrGenerator = $qr_generator;
     $this->configFactory = $config_factory;
     $this->logger = $logger;
     $this->time = $time;
+    $this->manifestationManager = $manifestation_manager;
   }
 
   /**
@@ -58,7 +78,10 @@ class ProvisioningManager {
    *   Group options keyed by group ID.
    */
   public function getGroups(): array {
-    return $this->apiClient->getGroups();
+    if ($this->groupsCache === NULL) {
+      $this->groupsCache = $this->apiClient->getGroups();
+    }
+    return $this->groupsCache;
   }
 
   /**
@@ -68,7 +91,37 @@ class ProvisioningManager {
    *   Calendar options keyed by calendar ID.
    */
   public function getCalendars(): array {
-    return $this->apiClient->getCalendars();
+    if ($this->calendarsCache === NULL) {
+      $this->calendarsCache = $this->apiClient->getCalendars();
+    }
+    return $this->calendarsCache;
+  }
+
+  /**
+   * Returns the optional list of allowed device categories.
+   *
+   * @return array<string, string>
+   *   Allowed categories keyed by lowercase value, with canonical values.
+   */
+  public function getAllowedCategories(): array {
+    $raw = (string) $this->configFactory->get('traccar_provisioning.settings')->get('allowed_categories');
+    $lines = preg_split('/\R/', $raw);
+    if (!is_array($lines)) {
+      return [];
+    }
+
+    $categories = [];
+    foreach ($lines as $line) {
+      foreach (explode(',', $line) as $category) {
+        $category = trim($category);
+        if ($category === '') {
+          continue;
+        }
+        $categories[mb_strtolower($category)] = $category;
+      }
+    }
+
+    return $categories;
   }
 
   /**
@@ -134,6 +187,28 @@ class ProvisioningManager {
   }
 
   /**
+   * Validates an expiration date.
+   *
+   * @param string $value
+   *   The date value. Accepted formats include Y-m-d, d/m/Y, d-m-Y and d.m.Y.
+   *
+   * @return string|null
+   *   An error message, or NULL when the date is valid or empty.
+   */
+  public function validateExpiration(string $value): ?string {
+    $value = trim($value);
+    if ($value === '') {
+      return NULL;
+    }
+
+    if ($this->parseDate($value) === NULL) {
+      return (string) $this->t('La date d’expiration est invalide. Utilisez jj/mm/aaaa, jj-mm-aaaa, jj.mm.aaaa ou aaaa-mm-jj.');
+    }
+
+    return NULL;
+  }
+
+  /**
    * Creates a Traccar device and generates its client configuration.
    *
    * @param string $identifier
@@ -149,6 +224,8 @@ class ProvisioningManager {
    *   Optional tracking parameters overriding the module defaults: accuracy,
    *   distance, interval, angle, heartbeat, buffer, wakelock, stop_detection
    *   and prefer_platform_providers.
+   * @param int $manifestation_id
+   *   Optional manifestation ID to associate with the created device.
    *
    * @return array
    *   Provisioning result data.
@@ -158,7 +235,7 @@ class ProvisioningManager {
    * @throws \Drupal\traccar_provisioning\Exception\TraccarApiException
    *   When the Traccar API request fails.
    */
-  public function createProvisioning(string $identifier, string $name, int $group_id = 0, array $device_data = [], array $tracking = []): array {
+  public function createProvisioning(string $identifier, string $name, int $group_id = 0, array $device_data = [], array $tracking = [], int $manifestation_id = 0): array {
     $identifier = trim($identifier);
     $name = trim($name);
 
@@ -185,6 +262,10 @@ class ProvisioningManager {
       throw new ProvisioningException('Vous devez sélectionner un groupe.');
     }
 
+    if ($manifestation_id > 0 && $this->manifestationManager->getManifestationName($manifestation_id) === NULL) {
+      throw new ProvisioningException('La manifestation sélectionnée n’existe plus.');
+    }
+
     $existing = $this->apiClient->findDeviceByUniqueId($identifier);
     if ($existing !== NULL) {
       throw new ProvisioningException(sprintf("Un appareil avec l'identifiant %s existe déjà sur le serveur Traccar.", $identifier));
@@ -199,13 +280,20 @@ class ProvisioningManager {
     $qr_svg = $this->qrGenerator->generateSvg($config_url);
 
     $device = $this->apiClient->createDevice($identifier, $name, $group_id, $extra);
+    $device_id = (int) $device['id'];
+
+    if ($manifestation_id > 0) {
+      $this->manifestationManager->associateDevice($manifestation_id, $device_id);
+    }
 
     $result = [
       'identifier' => $identifier,
       'name' => $name,
-      'device_id' => (int) $device['id'],
+      'device_id' => $device_id,
       'group_id' => $group_id,
       'group_name' => $groups[$group_id] ?? (string) $this->t('Aucun groupe'),
+      'manifestation_id' => $manifestation_id,
+      'manifestation_name' => $manifestation_id > 0 ? ($this->manifestationManager->getManifestationName($manifestation_id) ?? '') : '',
       'config_url' => $config_url,
       'qr_svg' => $qr_svg,
       'parameters' => $this->getParameterSummary($tracking),
@@ -329,7 +417,7 @@ class ProvisioningManager {
   }
 
   /**
-   * Converts a date (Y-m-d) to the ISO 8601 UTC end-of-day Traccar expects.
+   * Converts a supported date to the ISO 8601 UTC end-of-day Traccar expects.
    *
    * @param string $value
    *   The date entered in the form.
@@ -341,10 +429,8 @@ class ProvisioningManager {
    *   When the date is invalid.
    */
   protected function normalizeExpiration(string $value): string {
-    $timezone = $this->getSiteTimezone();
-    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, $timezone);
-    $errors = \DateTimeImmutable::getLastErrors();
-    if ($date === FALSE || ($errors !== FALSE && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+    $date = $this->parseDate($value);
+    if ($date === NULL) {
       throw new ProvisioningException("La date d'expiration est invalide.");
     }
 
@@ -355,8 +441,44 @@ class ProvisioningManager {
    * Formats an expiration date for display.
    */
   protected function formatExpiration(string $value): string {
-    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, $this->getSiteTimezone());
-    return $date !== FALSE ? $date->format('d/m/Y') : $value;
+    $date = $this->parseDate($value);
+    return $date !== NULL ? $date->format('d/m/Y') : $value;
+  }
+
+  /**
+   * Parses a supported date format in the site timezone.
+   *
+   * @param string $value
+   *   The date value.
+   *
+   * @return \DateTimeImmutable|null
+   *   The parsed date, or NULL when the value is invalid.
+   */
+  protected function parseDate(string $value): ?\DateTimeImmutable {
+    $value = trim($value);
+    if ($value === '') {
+      return NULL;
+    }
+
+    $timezone = $this->getSiteTimezone();
+    $formats = [
+      '!Y-m-d',
+      '!d/m/Y',
+      '!d-m-Y',
+      '!d.m.Y',
+      '!d/m/y',
+      '!d-m-y',
+    ];
+
+    foreach ($formats as $format) {
+      $date = \DateTimeImmutable::createFromFormat($format, $value, $timezone);
+      $errors = \DateTimeImmutable::getLastErrors();
+      if ($date !== FALSE && ($errors === FALSE || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
+        return $date;
+      }
+    }
+
+    return NULL;
   }
 
   /**
@@ -420,6 +542,50 @@ class ProvisioningManager {
     $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
 
     return $base . $separator . $query . $fragment;
+  }
+
+  /**
+   * Generates an SVG QR code for a device configuration.
+   *
+   * @param string $identifier
+   *   The device identifier.
+   * @param array $tracking
+   *   Optional tracking parameter overrides.
+   * @param int|null $size
+   *   The requested QR code size in pixels.
+   *
+   * @return string
+   *   The SVG markup.
+   *
+   * @throws \Drupal\traccar_provisioning\Exception\ProvisioningException
+   *   When the client URL is not configured.
+   * @throws \RuntimeException
+   *   When QR code generation fails.
+   */
+  public function generateQrSvg(string $identifier, array $tracking = [], ?int $size = NULL): string {
+    return $this->qrGenerator->generateSvg($this->buildConfigUrl($identifier, $tracking), $size);
+  }
+
+  /**
+   * Generates a PNG QR code for a device configuration.
+   *
+   * @param string $identifier
+   *   The device identifier.
+   * @param array $tracking
+   *   Optional tracking parameter overrides.
+   * @param int|null $size
+   *   The requested QR code size in pixels.
+   *
+   * @return string
+   *   The binary PNG data.
+   *
+   * @throws \Drupal\traccar_provisioning\Exception\ProvisioningException
+   *   When the client URL is not configured.
+   * @throws \RuntimeException
+   *   When QR code generation fails.
+   */
+  public function generateQrPng(string $identifier, array $tracking = [], ?int $size = NULL): string {
+    return $this->qrGenerator->generatePng($this->buildConfigUrl($identifier, $tracking), $size);
   }
 
   /**

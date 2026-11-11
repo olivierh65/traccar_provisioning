@@ -9,6 +9,7 @@ use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\Core\Url;
 use Drupal\traccar_provisioning\Exception\ProvisioningException;
 use Drupal\traccar_provisioning\Exception\TraccarApiException;
+use Drupal\traccar_provisioning\Service\ManifestationManager;
 use Drupal\traccar_provisioning\Service\ProvisioningManager;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -22,6 +23,11 @@ class ProvisionForm extends FormBase {
    * The provisioning manager.
    */
   protected ProvisioningManager $provisioningManager;
+
+  /**
+   * The manifestation storage.
+   */
+  protected ManifestationManager $manifestationManager;
 
   /**
    * The private temp store factory.
@@ -39,6 +45,7 @@ class ProvisionForm extends FormBase {
   public static function create(ContainerInterface $container): self {
     $instance = parent::create($container);
     $instance->provisioningManager = $container->get('traccar_provisioning.provisioning_manager');
+    $instance->manifestationManager = $container->get('traccar_provisioning.manifestation_manager');
     $instance->privateTempStoreFactory = $container->get('tempstore.private');
     $instance->logger = $container->get('logger.channel.traccar_provisioning');
     return $instance;
@@ -162,6 +169,36 @@ class ProvisionForm extends FormBase {
     if ($group_required) {
       $form['group_id']['#empty_option'] = $this->t('- Sélectionnez un groupe -');
     }
+
+    $manifestation_options = [0 => $this->t('Aucune manifestation')] + $this->manifestationManager->getManifestations();
+    $manifestation_options['new'] = $this->t('Créer une nouvelle manifestation…');
+
+    $form['manifestation'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Manifestation'),
+      '#open' => TRUE,
+      '#description' => $this->t('Rattachez l’appareil à une manifestation pour pouvoir supprimer tous ses appareils en une seule fois à la fin de l’événement.'),
+    ];
+
+    $form['manifestation']['manifestation_id'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Manifestation associée'),
+      '#options' => $manifestation_options,
+      '#default_value' => $form_state->getValue('manifestation_id', 0),
+      '#description' => $this->t('Laissez « Aucune manifestation » pour ne pas suivre cet appareil dans un lot de suppression.'),
+    ];
+
+    $form['manifestation']['manifestation_new'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Nom de la nouvelle manifestation'),
+      '#maxlength' => 255,
+      '#default_value' => $form_state->getValue('manifestation_new', ''),
+      '#states' => [
+        'visible' => [
+          ':input[name="manifestation_id"]' => ['value' => 'new'],
+        ],
+      ],
+    ];
 
     $form['device_details'] = [
       '#type' => 'details',
@@ -317,6 +354,20 @@ class ProvisionForm extends FormBase {
       $form_state->setErrorByName('name', $this->t('Le nom ne peut pas dépasser 255 caractères.'));
     }
 
+    $manifestation_id = (string) $form_state->getValue('manifestation_id', '0');
+    if ($manifestation_id === 'new') {
+      $manifestation_name = trim((string) $form_state->getValue('manifestation_new'));
+      if ($manifestation_name === '') {
+        $form_state->setErrorByName('manifestation_new', $this->t('Saisissez le nom de la nouvelle manifestation.'));
+      }
+      elseif (mb_strlen($manifestation_name) > 255) {
+        $form_state->setErrorByName('manifestation_new', $this->t('Le nom de la manifestation ne peut pas dépasser 255 caractères.'));
+      }
+    }
+    elseif ((int) $manifestation_id > 0 && $this->manifestationManager->getManifestationName((int) $manifestation_id) === NULL) {
+      $form_state->setErrorByName('manifestation_id', $this->t('La manifestation sélectionnée n’existe plus.'));
+    }
+
     $labels = [
       'phone' => $this->t('Téléphone'),
       'model' => $this->t('Modèle'),
@@ -333,10 +384,9 @@ class ProvisionForm extends FormBase {
 
     $expiration = trim((string) $form_state->getValue('expiration'));
     if ($expiration !== '') {
-      $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $expiration);
-      $errors = \DateTimeImmutable::getLastErrors();
-      if ($date === FALSE || ($errors !== FALSE && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
-        $form_state->setErrorByName('expiration', $this->t('La date d’expiration est invalide.'));
+      $error = $this->provisioningManager->validateExpiration($expiration);
+      if ($error !== NULL) {
+        $form_state->setErrorByName('expiration', $error);
       }
     }
 
@@ -372,6 +422,16 @@ class ProvisionForm extends FormBase {
     $identifier = trim((string) $form_state->getValue('identifier'));
     $name = trim((string) $form_state->getValue('name'));
     $group_id = (int) $form_state->getValue('group_id');
+
+    $manifestation_id = 0;
+    $manifestation_selection = (string) $form_state->getValue('manifestation_id', '0');
+    if ($manifestation_selection === 'new') {
+      $manifestation_id = $this->manifestationManager->getOrCreate((string) $form_state->getValue('manifestation_new'));
+    }
+    elseif ((int) $manifestation_selection > 0) {
+      $manifestation_id = (int) $manifestation_selection;
+    }
+
     $device_data = [
       'phone' => trim((string) $form_state->getValue('phone')),
       'model' => trim((string) $form_state->getValue('model')),
@@ -393,7 +453,7 @@ class ProvisionForm extends FormBase {
     ];
 
     try {
-      $result = $this->provisioningManager->createProvisioning($identifier, $name, $group_id, $device_data, $tracking);
+      $result = $this->provisioningManager->createProvisioning($identifier, $name, $group_id, $device_data, $tracking, $manifestation_id);
     }
     catch (ProvisioningException $exception) {
       $this->messenger()->addError($exception->getMessage());

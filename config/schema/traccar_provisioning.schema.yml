@@ -56,12 +56,18 @@ traccar_provisioning.settings:
     group_required:
       type: boolean
       label: 'Require a Traccar group'
+    allowed_categories:
+      type: string
+      label: 'Optional list of allowed device categories'
     qr_size:
       type: integer
       label: 'QR code size in pixels'
     qr_error_correction:
       type: string
       label: 'QR code error correction level'
+    qr_api_key:
+      type: string
+      label: 'QR code endpoint API key'
     identifier_pattern:
       type: string
       label: 'Optional identifier validation pattern'

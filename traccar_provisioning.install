@@ -6,6 +6,63 @@
  */
 
 /**
+ * Returns the database schema for the module.
+ */
+function _traccar_provisioning_schema(): array {
+  $schema = [];
+
+  $schema['traccar_manifestation'] = [
+    'description' => 'Manifestations used to group Traccar devices.',
+    'fields' => [
+      'id' => [
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'manifestation' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ],
+    ],
+    'primary key' => ['id'],
+    'unique keys' => [
+      'manifestation' => ['manifestation'],
+    ],
+  ];
+
+  $schema['traccar_manifestation_device'] = [
+    'description' => 'Associates Traccar devices with a manifestation.',
+    'fields' => [
+      'manifestation_id' => [
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'device_id' => [
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['device_id'],
+    'indexes' => [
+      'manifestation_id' => ['manifestation_id'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implements hook_schema().
+ */
+function traccar_provisioning_schema() {
+  return _traccar_provisioning_schema();
+}
+
+/**
  * Implements hook_requirements().
  */
 function traccar_provisioning_requirements($phase) {
@@ -24,4 +81,36 @@ function traccar_provisioning_requirements($phase) {
   }
 
   return $requirements;
+}
+
+/**
+ * Adds the QR endpoint API key to existing configurations.
+ */
+function traccar_provisioning_update_10001() {
+  $config = \Drupal::configFactory()->getEditable('traccar_provisioning.settings');
+  if ($config->get('qr_api_key') === NULL) {
+    $config->set('qr_api_key', '')->save();
+  }
+}
+
+/**
+ * Adds the optional allowed categories list to existing configurations.
+ */
+function traccar_provisioning_update_10002() {
+  $config = \Drupal::configFactory()->getEditable('traccar_provisioning.settings');
+  if ($config->get('allowed_categories') === NULL) {
+    $config->set('allowed_categories', '')->save();
+  }
+}
+
+/**
+ * Creates the manifestation and manifestation-device tables.
+ */
+function traccar_provisioning_update_10003() {
+  $database_schema = \Drupal::database()->schema();
+  foreach (_traccar_provisioning_schema() as $table => $definition) {
+    if (!$database_schema->tableExists($table)) {
+      $database_schema->createTable($table, $definition);
+    }
+  }
 }

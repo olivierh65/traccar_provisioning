@@ -8,6 +8,7 @@
  * - name: The device display name.
  * - device_id: The internal Traccar device ID.
  * - group_name: The selected Traccar group name.
+ * - manifestation_name: The associated manifestation name.
  * - config_url: The URL to import in Traccar Client.
  * - qr_svg: The generated QR code SVG markup.
  * - parameters: Tracking settings labels and values.
@@ -27,6 +28,11 @@
     <p>
       {{ 'Groupe : @group — ID interne Traccar : @id'|t({'@group': group_name, '@id': device_id}) }}
     </p>
+    {% if manifestation_name %}
+      <p>
+        {{ 'Manifestation : @name'|t({'@name': manifestation_name}) }}
+      </p>
+    {% endif %}
     {% if device_details %}
       <details class="traccar-provision-result__device-details">
         <summary>{{ 'Informations complémentaires de l’appareil'|t }}</summary>

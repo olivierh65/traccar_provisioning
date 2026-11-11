@@ -226,6 +226,23 @@ class TraccarApiClient {
   }
 
   /**
+   * Deletes a device from the Traccar server.
+   *
+   * @param int $device_id
+   *   The internal Traccar device ID.
+   *
+   * @throws \Drupal\traccar_provisioning\Exception\TraccarApiException
+   *   When the API request fails.
+   */
+  public function deleteDevice(int $device_id): void {
+    if ($device_id <= 0) {
+      throw new TraccarApiException("L'ID de l'appareil est invalide.");
+    }
+
+    $this->request('DELETE', '/devices/' . $device_id, [], 'delete device');
+  }
+
+  /**
    * Checks the connection and authentication by fetching groups.
    *
    * @param array $overrides

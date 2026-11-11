@@ -22,3 +22,28 @@ traccar_provisioning.result:
   requirements:
     _custom_access: '\Drupal\traccar_provisioning\Access\ProvisionAccess::access'
     token: '[a-f0-9]{32}'
+
+traccar_provisioning.qr:
+  path: '/traccar/qr'
+  defaults:
+    _controller: '\Drupal\traccar_provisioning\Controller\QrController::generate'
+    _title: 'QR code Traccar'
+  requirements:
+    _access: 'TRUE'
+  methods: [GET]
+
+traccar_provisioning.qr_batch:
+  path: '/admin/config/services/traccar-provisioning/qr-batch'
+  defaults:
+    _form: '\Drupal\traccar_provisioning\Form\QrBatchForm'
+    _title: 'Générer des QR codes en lot'
+  requirements:
+    _permission: 'administer traccar provisioning'
+
+traccar_provisioning.manifestation_delete:
+  path: '/admin/config/services/traccar-provisioning/manifestations/delete'
+  defaults:
+    _form: '\Drupal\traccar_provisioning\Form\ManifestationDeleteForm'
+    _title: 'Supprimer les appareils d’une manifestation'
+  requirements:
+    _permission: 'administer traccar provisioning'

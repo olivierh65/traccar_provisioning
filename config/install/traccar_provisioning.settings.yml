@@ -16,6 +16,8 @@ wakelock: true
 stop_detection: true
 prefer_platform_providers: false
 group_required: true
+allowed_categories: ''
 qr_size: 320
 qr_error_correction: M
+qr_api_key: ''
 identifier_pattern: ''
